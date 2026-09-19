@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "motion/react";
 import { Gavel, Target } from "lucide-react";
 import type { Case } from "@/types/case";
 import { useInvestigation } from "@/context/investigation-context";
@@ -24,12 +23,7 @@ export function ExpedienteView({ caseData }: { caseData: Case }) {
   const { stats, state } = useInvestigation();
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
-      className="flex flex-col gap-10"
-    >
+    <div className="flex flex-col gap-10">
       <SectionHeader
         eyebrow={caseData.caseNumber}
         title={caseData.title}
@@ -108,6 +102,6 @@ export function ExpedienteView({ caseData }: { caseData: Case }) {
           <ProgressStat label="Hipótesis creadas" value={stats.hypothesesCreated} />
         </div>
       </section>
-    </motion.div>
+    </div>
   );
 }
