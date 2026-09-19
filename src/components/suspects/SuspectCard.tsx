@@ -15,7 +15,6 @@ export function SuspectCard({
 }) {
   return (
     <motion.button
-      layoutId={`suspect-card-${suspect.id}`}
       onClick={onOpen}
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.99 }}

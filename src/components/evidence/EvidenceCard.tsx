@@ -50,7 +50,6 @@ export function EvidenceCard({
 
   return (
     <motion.button
-      layoutId={`evidence-card-${evidence.id}`}
       onClick={onOpen}
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.99 }}

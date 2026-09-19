@@ -16,7 +16,10 @@ export function SuspectModal({ suspect, onClose }: { suspect: Suspect; onClose: 
       onClick={onClose}
     >
       <motion.div
-        layoutId={`suspect-card-${suspect.id}`}
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        transition={{ duration: 0.18 }}
         onClick={(e) => e.stopPropagation()}
         className="flex max-h-[85vh] w-full max-w-lg flex-col gap-6 overflow-y-auto rounded-md border border-border-strong bg-panel-raised p-6 sm:p-8"
       >
