@@ -4,8 +4,10 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
+  useRef,
   type ReactNode,
 } from "react";
 import type { Accusation, Case, Hypothesis } from "@/types/case";
@@ -36,7 +38,8 @@ type Action =
   | { type: "ADD_HYPOTHESIS"; hypothesis: Hypothesis }
   | { type: "SUBMIT_ACCUSATION"; accusation: Accusation }
   | { type: "CLEAR_ACCUSATION" }
-  | { type: "RESET" };
+  | { type: "RESET" }
+  | { type: "HYDRATE"; state: InvestigationState };
 
 function addUnique(list: string[], id: string): string[] {
   return list.includes(id) ? list : [...list, id];
@@ -60,8 +63,34 @@ function reducer(state: InvestigationState, action: Action): InvestigationState 
       return { ...state, accusation: null };
     case "RESET":
       return initialState;
+    case "HYDRATE":
+      return action.state;
     default:
       return state;
+  }
+}
+
+function storageKey(caseId: string): string {
+  return `detective:investigation:${caseId}`;
+}
+
+function loadPersisted(caseId: string): InvestigationState | null {
+  try {
+    const raw = window.localStorage.getItem(storageKey(caseId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      viewedEvidenceIds: Array.isArray(parsed.viewedEvidenceIds) ? parsed.viewedEvidenceIds : [],
+      analyzedSuspectIds: Array.isArray(parsed.analyzedSuspectIds) ? parsed.analyzedSuspectIds : [],
+      reviewedTestimonyIds: Array.isArray(parsed.reviewedTestimonyIds)
+        ? parsed.reviewedTestimonyIds
+        : [],
+      visitedLocationIds: Array.isArray(parsed.visitedLocationIds) ? parsed.visitedLocationIds : [],
+      hypotheses: Array.isArray(parsed.hypotheses) ? parsed.hypotheses : [],
+      accusation: parsed.accusation ?? null,
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -105,6 +134,24 @@ export function InvestigationProvider({
   children: ReactNode;
 }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const hydratedCaseId = useRef<string | null>(null);
+
+  // Server-rendered state always starts empty; recover any saved progress
+  // for this case right after mount so hydration never mismatches.
+  useEffect(() => {
+    hydratedCaseId.current = caseData.id;
+    const persisted = loadPersisted(caseData.id);
+    dispatch({ type: "HYDRATE", state: persisted ?? initialState });
+  }, [caseData.id]);
+
+  useEffect(() => {
+    if (hydratedCaseId.current !== caseData.id) return;
+    try {
+      window.localStorage.setItem(storageKey(caseData.id), JSON.stringify(state));
+    } catch {
+      // Storage may be unavailable (private mode, quota, etc.); progress just won't persist.
+    }
+  }, [state, caseData.id]);
 
   const viewEvidence = useCallback((id: string) => dispatch({ type: "VIEW_EVIDENCE", id }), []);
   const analyzeSuspect = useCallback((id: string) => dispatch({ type: "ANALYZE_SUSPECT", id }), []);
