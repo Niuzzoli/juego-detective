@@ -9,11 +9,14 @@ import { isEvidenceUnlocked } from "@/lib/evidence-unlock";
 import { SuspectPicker } from "./SuspectPicker";
 import { EvidencePickerMulti } from "./EvidencePickerMulti";
 import { AccusationResult } from "./AccusationResult";
+import { AccusationPendingChoice } from "./AccusationPendingChoice";
 
 export function AccusationView({ caseData }: { caseData: Case }) {
   const {
     state,
     submitAccusation,
+    revealVerdict,
+    retryAccusation,
     clearAccusation,
     isEvidenceViewed,
     isTestimonyReviewed,
@@ -32,6 +35,25 @@ export function AccusationView({ caseData }: { caseData: Case }) {
           accusation={state.accusation}
           onRetry={() => {
             clearAccusation();
+            setSelectedSuspectId(null);
+            setSelectedEvidenceIds([]);
+            setConfirming(false);
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (state.pendingIncorrectAccusation) {
+    return (
+      <div className="flex flex-col gap-8">
+        <SectionHeader eyebrow={caseData.caseNumber} title="Acusación" />
+        <AccusationPendingChoice
+          caseData={caseData}
+          suspectId={state.pendingIncorrectAccusation.suspectId}
+          onReveal={revealVerdict}
+          onRetry={() => {
+            retryAccusation();
             setSelectedSuspectId(null);
             setSelectedEvidenceIds([]);
             setConfirming(false);
@@ -67,7 +89,7 @@ export function AccusationView({ caseData }: { caseData: Case }) {
       <SectionHeader
         eyebrow={caseData.caseNumber}
         title="Acusación"
-        description="Elegí a la persona que creés responsable y citá la evidencia que sostiene tu teoría. Es tu única acusación formal para este caso."
+        description="Elegí a la persona que creés responsable y citá la evidencia que sostiene tu teoría."
       />
 
       <div className="flex flex-col gap-3">
@@ -78,6 +100,7 @@ export function AccusationView({ caseData }: { caseData: Case }) {
           suspects={caseData.suspects}
           selectedId={selectedSuspectId}
           onSelect={handleSelectSuspect}
+          discardedIds={state.discardedSuspectIds}
         />
       </div>
 
@@ -106,8 +129,8 @@ export function AccusationView({ caseData }: { caseData: Case }) {
           <div className="flex items-start gap-2.5">
             <AlertTriangle className="h-4 w-4 shrink-0 text-case" strokeWidth={1.75} />
             <p className="text-sm text-ink">
-              Esta es tu acusación final para este caso. Una vez confirmada, vas a ver la
-              resolución completa. ¿Confirmás?
+              Si acertás, vas a ver la resolución completa del caso. Si no, vas a poder elegir
+              entre conocer el veredicto o volver a intentarlo con otro sospechoso. ¿Confirmás?
             </p>
           </div>
           <div className="flex gap-3">

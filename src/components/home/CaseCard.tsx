@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Calendar, FileSearch, Gauge, MapPin, Users } from "lucide-react";
 import type { Case } from "@/types/case";
 import { difficultyLabels } from "@/lib/labels";
-import { StatusStamp } from "@/components/ui/StatusStamp";
+import { CaseStatusBadge } from "./CaseStatusBadge";
 
 export function CaseCard({ caseData, index = 0 }: { caseData: Case; index?: number }) {
   return (
@@ -18,7 +18,7 @@ export function CaseCard({ caseData, index = 0 }: { caseData: Case; index?: numb
             <span className="font-mono text-xs uppercase tracking-[0.25em] text-ink-faint">
               {caseData.caseNumber}
             </span>
-            <StatusStamp status={caseData.status} />
+            <CaseStatusBadge caseData={caseData} />
           </div>
 
           <div className="flex flex-col gap-2">

@@ -19,6 +19,12 @@ interface InvestigationState {
   visitedLocationIds: string[];
   hypotheses: Hypothesis[];
   accusation: Accusation | null;
+  // An incorrect accusation the player hasn't yet resolved: they can still
+  // choose to see the verdict (which finalizes it into `accusation`) or
+  // retry with another suspect (which discards it, keeping the ruled-out
+  // suspect in `discardedSuspectIds`).
+  pendingIncorrectAccusation: Accusation | null;
+  discardedSuspectIds: string[];
 }
 
 const initialState: InvestigationState = {
@@ -28,6 +34,8 @@ const initialState: InvestigationState = {
   visitedLocationIds: [],
   hypotheses: [],
   accusation: null,
+  pendingIncorrectAccusation: null,
+  discardedSuspectIds: [],
 };
 
 type Action =
@@ -37,6 +45,8 @@ type Action =
   | { type: "VISIT_LOCATION"; id: string }
   | { type: "ADD_HYPOTHESIS"; hypothesis: Hypothesis }
   | { type: "SUBMIT_ACCUSATION"; accusation: Accusation }
+  | { type: "REVEAL_VERDICT" }
+  | { type: "RETRY_ACCUSATION" }
   | { type: "CLEAR_ACCUSATION" }
   | { type: "RESET" }
   | { type: "HYDRATE"; state: InvestigationState };
@@ -57,10 +67,25 @@ function reducer(state: InvestigationState, action: Action): InvestigationState 
       return { ...state, visitedLocationIds: addUnique(state.visitedLocationIds, action.id) };
     case "ADD_HYPOTHESIS":
       return { ...state, hypotheses: [action.hypothesis, ...state.hypotheses] };
-    case "SUBMIT_ACCUSATION":
-      return { ...state, accusation: action.accusation };
+    case "SUBMIT_ACCUSATION": {
+      const { accusation } = action;
+      if (accusation.correct) {
+        return { ...state, accusation, pendingIncorrectAccusation: null };
+      }
+      return {
+        ...state,
+        pendingIncorrectAccusation: accusation,
+        discardedSuspectIds: addUnique(state.discardedSuspectIds, accusation.suspectId),
+      };
+    }
+    case "REVEAL_VERDICT":
+      return state.pendingIncorrectAccusation
+        ? { ...state, accusation: state.pendingIncorrectAccusation, pendingIncorrectAccusation: null }
+        : state;
+    case "RETRY_ACCUSATION":
+      return { ...state, pendingIncorrectAccusation: null };
     case "CLEAR_ACCUSATION":
-      return { ...state, accusation: null };
+      return { ...state, accusation: null, pendingIncorrectAccusation: null, discardedSuspectIds: [] };
     case "RESET":
       return initialState;
     case "HYDRATE":
@@ -70,13 +95,15 @@ function reducer(state: InvestigationState, action: Action): InvestigationState 
   }
 }
 
-function storageKey(caseId: string): string {
+// Exported so other client code (e.g. the home page's case list) can read
+// the same persisted progress without duplicating the key format.
+export function investigationStorageKey(caseId: string): string {
   return `detective:investigation:${caseId}`;
 }
 
 function loadPersisted(caseId: string): InvestigationState | null {
   try {
-    const raw = window.localStorage.getItem(storageKey(caseId));
+    const raw = window.localStorage.getItem(investigationStorageKey(caseId));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return {
@@ -88,6 +115,8 @@ function loadPersisted(caseId: string): InvestigationState | null {
       visitedLocationIds: Array.isArray(parsed.visitedLocationIds) ? parsed.visitedLocationIds : [],
       hypotheses: Array.isArray(parsed.hypotheses) ? parsed.hypotheses : [],
       accusation: parsed.accusation ?? null,
+      pendingIncorrectAccusation: parsed.pendingIncorrectAccusation ?? null,
+      discardedSuspectIds: Array.isArray(parsed.discardedSuspectIds) ? parsed.discardedSuspectIds : [],
     };
   } catch {
     return null;
@@ -115,6 +144,8 @@ interface InvestigationContextValue {
   visitLocation: (id: string) => void;
   addHypothesis: (evidenceIds: string[], text: string) => void;
   submitAccusation: (suspectId: string, evidenceIds: string[]) => void;
+  revealVerdict: () => void;
+  retryAccusation: () => void;
   clearAccusation: () => void;
   resetInvestigation: () => void;
   isEvidenceViewed: (id: string) => boolean;
@@ -147,7 +178,7 @@ export function InvestigationProvider({
   useEffect(() => {
     if (hydratedCaseId.current !== caseData.id) return;
     try {
-      window.localStorage.setItem(storageKey(caseData.id), JSON.stringify(state));
+      window.localStorage.setItem(investigationStorageKey(caseData.id), JSON.stringify(state));
     } catch {
       // Storage may be unavailable (private mode, quota, etc.); progress just won't persist.
     }
@@ -182,6 +213,8 @@ export function InvestigationProvider({
     },
     [caseData.solution.guiltySuspectId],
   );
+  const revealVerdict = useCallback(() => dispatch({ type: "REVEAL_VERDICT" }), []);
+  const retryAccusation = useCallback(() => dispatch({ type: "RETRY_ACCUSATION" }), []);
   const clearAccusation = useCallback(() => dispatch({ type: "CLEAR_ACCUSATION" }), []);
   const resetInvestigation = useCallback(() => dispatch({ type: "RESET" }), []);
 
@@ -226,13 +259,15 @@ export function InvestigationProvider({
     visitLocation,
     addHypothesis,
     submitAccusation,
+    revealVerdict,
+    retryAccusation,
     clearAccusation,
     resetInvestigation,
     isEvidenceViewed,
     isSuspectAnalyzed,
     isTestimonyReviewed,
     isLocationVisited,
-    isCaseSolved: state.accusation?.correct ?? false,
+    isCaseSolved: state.accusation !== null,
   };
 
   return (
